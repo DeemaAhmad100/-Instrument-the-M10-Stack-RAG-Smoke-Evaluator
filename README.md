@@ -99,6 +99,10 @@ middlewares + mount `/metrics` in `api/main.py`, and implement
 docker compose down -v
 ```
 
+## Observability
+
+The M11 backend exports three Prometheus metric families via the `/metrics` endpoint. `requests_total` is a counter that tracks the total number of HTTP requests by path and status code, providing visibility into traffic patterns and error rates. `request_latency_seconds` is a histogram that captures request latency in seconds across all paths using Prometheus's default latency buckets (0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0), chosen because they appropriately capture the typical sub-second and low-second latency profile of the M10 stack. `inflight_requests` is a gauge that tracks the number of requests currently being processed, enabling monitoring of concurrency. To read the metrics, issue `curl -L http://localhost:8000/metrics` and parse the output—metrics are emitted in OpenMetrics text format with `# HELP` and `# TYPE` lines followed by metric samples.
+
 ## Submission
 
 Open a PR within your fork. The PR description must include:

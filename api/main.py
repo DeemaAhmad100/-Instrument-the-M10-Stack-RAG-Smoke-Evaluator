@@ -32,11 +32,19 @@ from fastapi.middleware.cors import CORSMiddleware
 # TODO (learner): import the three middleware classes from api.observability.
 # Hint: RequestIdMiddleware, StructuredLoggingMiddleware, MetricsMiddleware.
 # ---------------------------------------------------------------------------
+from .observability import (
+    MetricsMiddleware,
+    RequestIdMiddleware,
+    StructuredLoggingMiddleware,
+    get_cardinality_usage,
+    get_exemplars,
+)
 
 # ---------------------------------------------------------------------------
 # TODO (learner): import make_asgi_app from prometheus_client so you can
 # mount /metrics below.
 # ---------------------------------------------------------------------------
+from prometheus_client import make_asgi_app
 
 from .deps import get_generator, get_nlp, get_session, get_weaviate
 from .kg import wrap_kg_query
@@ -136,11 +144,46 @@ app.add_middleware(
 # so the LAST add_middleware call is the OUTERMOST layer. You want:
 #     request-id outermost, structured-logging middle, metrics innermost.
 # ---------------------------------------------------------------------------
+app.add_middleware(MetricsMiddleware)
+app.add_middleware(StructuredLoggingMiddleware)
+app.add_middleware(RequestIdMiddleware)
 
 
 # ---------------------------------------------------------------------------
 # TODO (learner): mount /metrics on ``app`` using ``make_asgi_app()``.
 # ---------------------------------------------------------------------------
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+
+
+# ---------------------------------------------------------------------------
+# Tier 3 Challenge: Cardinality monitoring endpoint
+# ---------------------------------------------------------------------------
+
+@app.get("/debug/cardinality")
+def debug_cardinality():
+    """Return per-metric cardinality usage stats.
+    
+    Gated by DEBUG env var (if set to anything, enabled; otherwise disabled).
+    Requires authentication in production.
+    """
+    debug_enabled = os.environ.get("DEBUG", "").lower() in ("1", "true", "yes")
+    if not debug_enabled:
+        raise HTTPException(status_code=403, detail="cardinality debug disabled")
+    return get_cardinality_usage()
+
+
+@app.get("/debug/exemplars")
+def debug_exemplars():
+    """Return recorded exemplars (one per histogram bucket per path/status).
+    
+    Gated by DEBUG env var (if set to anything, enabled; otherwise disabled).
+    Uses reservoir sampling for probabilistic exemplar retention.
+    """
+    debug_enabled = os.environ.get("DEBUG", "").lower() in ("1", "true", "yes")
+    if not debug_enabled:
+        raise HTTPException(status_code=403, detail="exemplars debug disabled")
+    return get_exemplars()
 
 
 # ---------------------------------------------------------------------------

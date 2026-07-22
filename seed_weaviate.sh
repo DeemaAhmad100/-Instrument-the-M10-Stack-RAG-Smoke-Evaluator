@@ -20,7 +20,16 @@ set +a
 export MSYS_NO_PATHCONV=1
 
 echo "Seeding Weaviate via the api container ..."
-docker compose exec -T \
-  -e WEAVIATE_URL="${WEAVIATE_URL:-http://weaviate:8080}" \
-  api python /app/api/seed_weaviate.py
+
+# If the api service is running in compose, use exec.
+# Otherwise, fall back to host python (useful for CI where api runs on host).
+if [ -n "$(docker compose ps api --status running -q 2>/dev/null)" ]; then
+  docker compose exec -T \
+    -e WEAVIATE_URL="${WEAVIATE_URL:-http://weaviate:8080}" \
+    api python /app/api/seed_weaviate.py
+else
+  echo "API container not found via 'docker compose exec'. Trying host python..."
+  WEAVIATE_URL="${WEAVIATE_URL:-http://localhost:8080}" python api/seed_weaviate.py
+fi
+
 echo "Done."

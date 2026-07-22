@@ -21,7 +21,19 @@ if [ ! -f "$SEED_FILE" ]; then
   exit 1
 fi
 
-echo "Seeding Neo4j (loading $SEED_FILE via cypher-shell inside the neo4j container) ..."
-docker compose exec -T neo4j cypher-shell \
-  -u "$NEO4J_USER" -p "$NEO4J_PASSWORD" < "$SEED_FILE"
+echo "Seeding Neo4j (loading $SEED_FILE via cypher-shell) ..."
+
+# If we are in a Docker Compose environment and the service is running, use exec.
+# Otherwise, fall back to a one-off container that connects to localhost (useful for CI).
+if [ -n "$(docker compose ps neo4j --status running -q 2>/dev/null)" ]; then
+  docker compose exec -T neo4j cypher-shell \
+    -u "$NEO4J_USER" -p "$NEO4J_PASSWORD" < "$SEED_FILE"
+else
+  # Fallback for GHA services or when compose isn't up
+  echo "Neo4j container not found via 'docker compose exec'. Trying 'docker run' against localhost..."
+  docker run --rm -i --network host neo4j:5-community cypher-shell \
+    -a bolt://localhost:7687 \
+    -u "$NEO4J_USER" -p "$NEO4J_PASSWORD" < "$SEED_FILE"
+fi
+
 echo "Done."

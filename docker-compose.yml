@@ -1,6 +1,5 @@
 # M10 four-service stack with the M11 instrumentation hooks wired into `api`.
 # Learner brings up via: docker compose up -d
-version: "3.9"
 
 services:
   neo4j:

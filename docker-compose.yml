@@ -1,5 +1,6 @@
 # M10 four-service stack with the M11 instrumentation hooks wired into `api`.
 # Learner brings up via: docker compose up -d
+version: "3.9"
 
 services:
   neo4j:
@@ -14,8 +15,8 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "cypher-shell -a bolt://localhost:7687 -u neo4j -p ${NEO4J_PASSWORD:-devpassword} 'RETURN 1' || exit 1"]
       interval: 10s
-      retries: 18
-      start_period: 30s
+      retries: 30
+      start_period: 90s
 
   weaviate:
     image: semitechnologies/weaviate:1.24.10

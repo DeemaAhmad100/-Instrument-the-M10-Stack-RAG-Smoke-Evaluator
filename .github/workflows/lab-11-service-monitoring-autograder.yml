@@ -33,8 +33,8 @@ jobs:
         options: >-
           --health-cmd "cypher-shell -a bolt://localhost:7687 -u neo4j -p devpassword 'RETURN 1' || exit 1"
           --health-interval 10s
-          --health-retries 18
-          --health-start-period 30s
+          --health-retries 30
+          --health-start-period 90s
       weaviate:
         image: semitechnologies/weaviate:1.24.10
         ports:

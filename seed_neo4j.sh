@@ -14,6 +14,8 @@ set +a
 
 NEO4J_PASSWORD="${NEO4J_PASSWORD:-devpassword}"
 NEO4J_USER="${NEO4J_USER:-neo4j}"
+NEO4J_HOST="${NEO4J_HOST:-localhost}"
+NEO4J_PORT="${NEO4J_PORT:-7687}"
 SEED_FILE="api/seed.cypher"
 
 if [ ! -f "$SEED_FILE" ]; then
@@ -21,7 +23,29 @@ if [ ! -f "$SEED_FILE" ]; then
   exit 1
 fi
 
-echo "Seeding Neo4j (loading $SEED_FILE via cypher-shell inside the neo4j container) ..."
-docker compose exec -T neo4j cypher-shell \
-  -u "$NEO4J_USER" -p "$NEO4J_PASSWORD" < "$SEED_FILE"
+NEO4J_URI="bolt://${NEO4J_HOST}:${NEO4J_PORT}"
+
+# Wait for Neo4j to be ready (max 60 seconds)
+echo "Waiting for Neo4j at $NEO4J_URI to be ready..."
+MAX_ATTEMPTS=60
+ATTEMPT=0
+while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+  if cypher-shell -a "$NEO4J_URI" -u "$NEO4J_USER" -p "$NEO4J_PASSWORD" "RETURN 1" > /dev/null 2>&1; then
+    echo "Neo4j is ready!"
+    break
+  fi
+  ATTEMPT=$((ATTEMPT + 1))
+  if [ $((ATTEMPT % 10)) -eq 0 ]; then
+    echo "  Attempt $ATTEMPT/$MAX_ATTEMPTS..."
+  fi
+  sleep 1
+done
+
+if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+  echo "ERROR: Neo4j did not become ready after $MAX_ATTEMPTS seconds at $NEO4J_URI" >&2
+  exit 1
+fi
+
+echo "Seeding Neo4j (loading $SEED_FILE)..."
+cypher-shell -a "$NEO4J_URI" -u "$NEO4J_USER" -p "$NEO4J_PASSWORD" -f "$SEED_FILE"
 echo "Done."

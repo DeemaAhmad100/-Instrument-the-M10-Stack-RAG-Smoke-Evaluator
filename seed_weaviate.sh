@@ -19,8 +19,40 @@ set +a
 # suppresses that conversion so the container receives the intended path.
 export MSYS_NO_PATHCONV=1
 
-echo "Seeding Weaviate via the api container ..."
-docker compose exec -T \
-  -e WEAVIATE_URL="${WEAVIATE_URL:-http://weaviate:8080}" \
-  api python /app/api/seed_weaviate.py
+WEAVIATE_URL="${WEAVIATE_URL:-http://localhost:8080}"
+SEED_SCRIPT="api/seed_weaviate.py"
+
+# Wait for Weaviate to be ready (max 60 seconds)
+echo "Waiting for Weaviate to be ready at $WEAVIATE_URL..."
+MAX_ATTEMPTS=60
+ATTEMPT=0
+while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+  if curl -s "$WEAVIATE_URL/v1/.well-known/ready" > /dev/null 2>&1; then
+    echo "Weaviate is ready!"
+    break
+  fi
+  ATTEMPT=$((ATTEMPT + 1))
+  if [ $((ATTEMPT % 10)) -eq 0 ]; then
+    echo "  Attempt $ATTEMPT/$MAX_ATTEMPTS..."
+  fi
+  sleep 1
+done
+
+if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+  echo "ERROR: Weaviate did not become ready after $MAX_ATTEMPTS seconds at $WEAVIATE_URL" >&2
+  exit 1
+fi
+
+# Try to run seeder directly (for GitHub Actions service containers)
+if command -v python &> /dev/null && [ -f "$SEED_SCRIPT" ]; then
+  echo "Seeding Weaviate directly with Python..."
+  export WEAVIATE_URL="$WEAVIATE_URL"
+  python "$SEED_SCRIPT"
+else
+  # Fall back to docker compose (for local development)
+  echo "Seeding Weaviate via the api container..."
+  docker compose exec -T \
+    -e WEAVIATE_URL="$WEAVIATE_URL" \
+    api python /app/api/seed_weaviate.py
+fi
 echo "Done."
